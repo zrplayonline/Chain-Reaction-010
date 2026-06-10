@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chain Reaction: Critical Mass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #020208;
+            color: #e2e8f0;
+            overflow: hidden;
+            font-family: 'Rajdhani', sans-serif;
+            touch-action: none;
+        }
+        .orbitron-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .glass-panel {
+            background: rgba(10, 10, 26, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+        .btn-sci-fi {
+            position: relative;
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid #06b6d4;
+            color: #22d3ee;
+            font-weight: 700;
+            letter-spacing: 2px;
+            transition: all 0.2s ease-out;
+            overflow: hidden;
+        }
+        .btn-sci-fi::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.2), transparent);
+            transition: all 0.5s;
+        }
+        .btn-sci-fi:hover::before {
+            left: 100%;
+        }
+        .btn-sci-fi:hover {
+            background: rgba(6, 182, 212, 0.2);
+            transform: translateY(-1px);
+        }
+        .btn-pink {
+            background: rgba(236, 72, 153, 0.05);
+            border: 1px solid #ec4899;
+            color: #f472b6;
+        }
+        .btn-pink:hover {
+            background: rgba(236, 72, 153, 0.2);
+        }
+        .hud-element {
+            pointer-events: auto;
+            background: rgba(4, 4, 12, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(6px);
+            transition: filter 0.5s ease, opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sound Toggle System -->
+    <div class="fixed top-4 right-4 z-50 pointer-events-auto">
+        <button id="mute-btn" onclick="toggleMute()" class="p-3 glass-panel rounded-full hover:bg-slate-800 transition text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+            <svg id="sound-on-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            <svg id="sound-off-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        </button>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 md:p-6 hidden">
+        <!-- Top HUD Panel (Dynamic based on player count) -->
+        <div class="relative w-full max-w-5xl mx-auto flex justify-between items-start">
+            
+            <!-- Player Stats Container (Left) -->
+            <div id="player-stats-left" class="flex flex-col gap-2 z-20">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Current Phase Indicator -->
+            <div id="turn-indicator" class="hud-element px-6 py-2 rounded-xl border flex flex-col items-center justify-center text-center shadow-lg z-10 absolute left-1/2 transform -translate-x-1/2">
+                <span class="text-[10px] tracking-widest text-slate-400 font-bold uppercase mb-1">REACTION CORE PHASE</span>
+                <span class="text-lg md:text-xl font-extrabold tracking-wider orbitron-font" id="turn-txt">READY</span>
+            </div>
+
+            <!-- Player Stats Container (Right) -->
+            <div id="player-stats-right" class="flex flex-col gap-2 z-20 items-end">
+                <!-- Injected via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Bottom Informational Bar -->
+        <div class="w-full max-w-5xl mx-auto flex justify-between items-center text-xs tracking-wider text-slate-500 font-semibold px-2">
+            <span>GRID SYSTEM: V-11.0 (MULTI-CORE)</span>
+            <span id="ai-status" class="text-cyan-500/60 hidden">AI ENGINE IDLE...</span>
+            <button onclick="returnToMainMenu()" class="pointer-events-auto hover:text-white transition duration-200 uppercase bg-slate-900/60 hover:bg-slate-800 px-3 py-1.5 rounded border border-slate-800">Abort Mission</button>
+        </div>
+    </div>
+
+    <!-- Main Menu Screen -->
+    <div id="start-screen" class="absolute inset-0 flex flex-col justify-center items-center z-20 bg-[#03030c]/95 px-4 overflow-y-auto">
+        <div class="max-w-2xl text-center flex flex-col items-center">
+            <!-- High-tech background grid aesthetic -->
+            <div class="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            
+            <div class="relative mb-6 mt-8">
+                <h1 class="relative text-6xl md:text-8xl font-black tracking-tighter text-white orbitron-font leading-none select-none">
+                    CHAIN<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-pink-500">REACTION</span>
+                </h1>
+            </div>
+
+            <p class="text-slate-400 text-lg md:text-xl font-medium tracking-wide mb-8 max-w-lg leading-relaxed">
+                A tactical fusion game of cascading explosions. Populate cells with atoms, trigger critical mass, and dominate the grid space.
+            </p>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-2xl mb-10">
+                <button onclick="startGame('pvai')" class="btn-sci-fi btn-pink text-xs md:text-sm py-4 px-2 rounded-lg uppercase font-bold shadow-lg">
+                    Play vs AI
+                </button>
+                <button onclick="startGame('2p')" class="btn-sci-fi text-xs md:text-sm py-4 px-2 rounded-lg uppercase font-bold shadow-lg">
+                    2 Players
+                </button>
+                <button onclick="startGame('3p')" class="btn-sci-fi text-xs md:text-sm py-4 px-2 rounded-lg uppercase font-bold shadow-lg">
+                    3 Players
+                </button>
+                <button onclick="startGame('4p')" class="btn-sci-fi text-xs md:text-sm py-4 px-2 rounded-lg uppercase font-bold shadow-lg">
+                    4 Players
+                </button>
+            </div>
+
+            <!-- Enhanced Interactive Instructions Page -->
+            <div class="glass-panel p-6 rounded-xl max-w-md border border-slate-800 text-left mb-8">
+                <h3 class="text-cyan-400 font-bold tracking-wider uppercase mb-3 orbitron-font text-sm flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span> Grid Dynamics Directive
+                </h3>
+                <ul class="text-xs space-y-2 text-slate-300">
+                    <li class="flex items-start gap-2">
+                        <span class="text-cyan-400">⚡</span>
+                        <span>Click an empty cell or one you own to place an <b>Atom</b>.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-cyan-400">⚡</span>
+                        <span>When atom count equals capacity (<b>Corners: 2, Edges: 3, Centers: 4</b>), it hits <b>critical mass</b>.</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-cyan-400">⚡</span>
+                        <span>Exploding cells disperse their energy into adjacent neighbors, capturing and potentially triggering sub-explosions!</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-pink-400">⚡</span>
+                        <span>Eliminate all opponent presence to establish full supremacy.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="absolute inset-0 flex flex-col justify-center items-center z-20 bg-slate-950/90 hidden px-4">
+        <div class="glass-panel max-w-md w-full p-8 rounded-2xl text-center relative border border-slate-800 shadow-2xl">
+            <p class="text-slate-400 text-sm tracking-widest font-extrabold uppercase mb-2">Supremacy Achieved</p>
+            <h2 id="winner-text" class="text-4xl md:text-6xl font-extrabold mb-8 tracking-wider uppercase orbitron-font">PLAYER 1 WINS</h2>
+            
+            <div class="flex flex-col gap-3">
+                <button onclick="resetGame()" class="btn-sci-fi text-sm py-3.5 rounded-lg font-bold">
+                    Engage Again
+                </button>
+                <button onclick="returnToMainMenu()" class="text-slate-400 hover:text-white font-bold text-sm tracking-wider uppercase transition py-2 mt-2">
+                    Return to Terminal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // High-Quality Web Audio Sound Synthesizer
+        const AudioEngine = {
+            ctx: null,
+            muted: false,
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+
+            playClick(freq = 400) {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            },
+
+            playExplosion(intensity = 1) {
+                if (this.muted) return;
+                this.init();
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(250 * intensity, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + 0.35);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.35);
+            },
+
+            playWin() {
+                if (this.muted) return;
+                this.init();
+                
+                const now = this.ctx.currentTime;
+                const playNote = (freq, start, duration) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + start);
+                    gain.gain.setValueAtTime(0.08, now + start);
+                    gain.gain.exponentialRampToValueAtTime(0.005, now + start + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + start);
+                    osc.stop(now + start + duration);
+                };
+
+                playNote(261.63, 0.0, 0.2); // C4
+                playNote(329.63, 0.15, 0.2); // E4
+                playNote(392.00, 0.3, 0.2); // G4
+                playNote(523.25, 0.45, 0.5); // C5
+            }
+        };
+
+        function toggleMute() {
+            AudioEngine.muted = !AudioEngine.muted;
+            document.getElementById('sound-on-icon').classList.toggle('hidden', AudioEngine.muted);
+            document.getElementById('sound-off-icon').classList.toggle('hidden', !AudioEngine.muted);
+            AudioEngine.playClick(300);
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game Configuration
+        const COLS = 10;
+        const ROWS = 6;
+        let cellW, cellH;
+        let gridOffsetX = 0;
+        let gridOffsetY = 0;
+        
+        // Multi-color palette for 1 to 4 players
+        const ALL_PLAYERS = [
+            { id: 1, name: 'CYAN', color: '#00f3ff', borderGlow: 'rgba(6, 182, 212, 0.25)' },
+            { id: 2, name: 'NEON', color: '#ec4899', borderGlow: 'rgba(236, 72, 153, 0.25)' },
+            { id: 3, name: 'GOLD', color: '#facc15', borderGlow: 'rgba(250, 204, 21, 0.25)' },
+            { id: 4, name: 'LIME', color: '#4ade80', borderGlow: 'rgba(74, 222, 128, 0.25)' }
+        ];
+
+        // Core Game States
+        let grid = [];
+        let activePlayers = [];
+        let currentPlayerIndex = 0;
+        let gameActive = false;
+        let isAnimating = false;
+        let particles = [];
+        let shockwaves = [];
+        let gameMode = '2p';
+        let gameOverTimeout = null;
+
+        // Visual effects ticker
+        let globalTime = 0;
+
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(dpr, dpr);
+            
+            const hudMargin = window.innerWidth < 768 ? 130 : 110; 
+            const padding = Math.min(window.innerWidth, window.innerHeight) * 0.05;
+            const availableW = window.innerWidth - padding * 2;
+            const availableH = window.innerHeight - padding * 2 - hudMargin;
+
+            const size = Math.min(availableW / COLS, availableH / ROWS);
+            cellW = size;
+            cellH = size;
+
+            gridOffsetX = (window.innerWidth - (cellW * COLS)) / 2;
+            gridOffsetY = (window.innerHeight - (cellH * ROWS)) / 2 + (hudMargin / 2);
+        }
+
+        window.addEventListener('resize', () => { resize(); });
+        
+        canvas.addEventListener('mousedown', (e) => handleInteraction(e));
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleInteraction(e.touches[0]);
+        }, { passive: false });
+
+        function handleInteraction(e) {
+            if (!gameActive || isAnimating) return;
+            if (gameMode === 'pvai' && currentPlayerIndex === 1) return; // Block input during AI turn
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left - gridOffsetX;
+            const mouseY = e.clientY - rect.top - gridOffsetY;
+
+            const col = Math.floor(mouseX / cellW);
+            const row = Math.floor(mouseY / cellH);
+
+            if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+                processClick(col, row);
+            }
+        }
+
+        function startGame(mode) {
+            AudioEngine.init();
+            AudioEngine.playClick(600);
+            clearTimeout(gameOverTimeout);
+            if (mode) gameMode = mode;
+
+            // Setup Active Players Array
+            activePlayers = [];
+            if (gameMode === 'pvai') {
+                activePlayers.push({...ALL_PLAYERS[0], name: 'P1 (YOU)', hasPlayed: false, isDead: false});
+                activePlayers.push({...ALL_PLAYERS[1], name: 'AI', hasPlayed: false, isDead: false});
+                document.getElementById('ai-status').classList.remove('hidden');
+            } else {
+                document.getElementById('ai-status').classList.add('hidden');
+                let numPlayers = parseInt(gameMode.charAt(0));
+                for(let i=0; i<numPlayers; i++) {
+                    activePlayers.push({...ALL_PLAYERS[i], name: `P${i+1}`, hasPlayed: false, isDead: false});
+                }
+            }
+
+            // Build Dynamic HUD
+            const containerLeft = document.getElementById('player-stats-left');
+            const containerRight = document.getElementById('player-stats-right');
+            containerLeft.innerHTML = '';
+            containerRight.innerHTML = '';
+            
+            activePlayers.forEach((p, index) => {
+                const isLeft = index % 2 === 0;
+                const statHTML = `
+                    <div id="stat-p${index}" class="hud-element px-3 py-1.5 rounded-lg flex items-center justify-between min-w-[110px] md:min-w-[140px]" style="border-${isLeft ? 'left' : 'right'}: 4px solid ${p.color}; box-shadow: ${isLeft ? '-4px' : '4px'} 0 10px ${p.color}20; flex-direction: ${isLeft ? 'row' : 'row-reverse'};">
+                        <span class="text-[9px] md:text-[11px] uppercase tracking-wider font-semibold orbitron-font" style="color: ${p.color}">${p.name}</span>
+                        <span class="text-lg md:text-xl font-black orbitron-font ${isLeft ? 'ml-3' : 'mr-3'}" id="p${index}-score-val" style="color: ${p.color}">0%</span>
+                    </div>
+                `;
+                
+                if (isLeft) {
+                    containerLeft.innerHTML += statHTML;
+                } else {
+                    containerRight.innerHTML += statHTML;
+                }
+            });
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            initGrid();
+            currentPlayerIndex = 0;
+            isAnimating = false;
+            particles = [];
+            shockwaves = [];
+            gameActive = true;
+            resize();
+            updateHUD();
+        }
+
+        function resetGame() {
+            startGame(gameMode);
+        }
+
+        function returnToMainMenu() {
+            AudioEngine.playClick(300);
+            clearTimeout(gameOverTimeout);
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            gameActive = false;
+            particles = [];
+            shockwaves = [];
+            initGrid();
+        }
+
+        function updateHUD() {
+            const indicator = document.getElementById('turn-indicator');
+            const pText = document.getElementById('turn-txt');
+            const player = activePlayers[currentPlayerIndex];
+
+            pText.innerText = `${player.name}'S TURN`;
+            pText.style.color = player.color;
+            indicator.style.borderColor = player.color + '60';
+
+            // Calculate grid control 
+            let totalActiveCells = 0;
+            let playerCounts = new Array(activePlayers.length).fill(0);
+
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    const owner = grid[x][y].owner;
+                    if (owner) {
+                        totalActiveCells++;
+                        const idx = activePlayers.findIndex(p => p.id === owner.id);
+                        if(idx !== -1) playerCounts[idx]++;
+                    }
+                }
+            }
+
+            // Apply stats and check for deaths to grey-out HUD
+            activePlayers.forEach((p, idx) => {
+                const pct = totalActiveCells > 0 ? Math.round((playerCounts[idx] / totalActiveCells) * 100) : 0;
+                const scoreEl = document.getElementById(`p${idx}-score-val`);
+                const statBox = document.getElementById(`stat-p${idx}`);
+                
+                if (scoreEl) scoreEl.innerText = `${pct}%`;
+                
+                if (p.isDead && statBox) {
+                    statBox.style.opacity = '0.3';
+                    statBox.style.filter = 'grayscale(100%)';
+                }
+            });
+        }
+
+        function makeAIMove() {
+            if (!gameActive) return;
+            document.getElementById('ai-status').innerText = 'AI THINKING...';
+            document.getElementById('ai-status').style.color = '#f472b6';
+            
+            const aiPlayer = activePlayers[1];
+            let validMoves = [];
+            
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    const cell = grid[x][y];
+                    if (cell.owner === null || cell.owner.id === aiPlayer.id) {
+                        validMoves.push({x, y, cell});
+                    }
+                }
+            }
+            
+            if (validMoves.length === 0) return;
+            
+            let threatAndOpportunity = [];
+            
+            validMoves.forEach(m => {
+                let rating = 0;
+                if (m.cell.count === m.cell.capacity - 1) {
+                    rating += 15;
+                    const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+                    directions.forEach(dir => {
+                        const nx = m.x + dir[0];
+                        const ny = m.y + dir[1];
+                        if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                            const neighbor = grid[nx][ny];
+                            if (neighbor.owner && neighbor.owner.id !== aiPlayer.id) {
+                                rating += (neighbor.count * 2.5); // Prioritize capturing enemies
+                            }
+                        }
+                    });
+                }
+                threatAndOpportunity.push({ move: m, score: rating });
+            });
+
+            threatAndOpportunity.sort((a, b) => b.score - a.score);
+            let chosenMove = (Math.random() < 0.9) ? threatAndOpportunity[0].move : validMoves[Math.floor(Math.random() * validMoves.length)];
+
+            setTimeout(() => {
+                if (!gameActive) return;
+                processClick(chosenMove.x, chosenMove.y);
+                document.getElementById('ai-status').innerText = 'AI ENGINE IDLE...';
+                document.getElementById('ai-status').style.color = '#00f3ff';
+            }, 450);
+        }
+
+        function initGrid() {
+            grid = [];
+            for (let x = 0; x < COLS; x++) {
+                grid[x] = [];
+                for (let y = 0; y < ROWS; y++) {
+                    let capacity = 4; // Center
+                    if ((x === 0 && y === 0) || (x === 0 && y === ROWS - 1) || 
+                        (x === COLS - 1 && y === 0) || (x === COLS - 1 && y === ROWS - 1)) {
+                        capacity = 2; // Corners
+                    } else if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) {
+                        capacity = 3; // Edges
+                    }
+                    grid[x][y] = { 
+                        count: 0, 
+                        capacity: capacity, 
+                        owner: null,
+                        impactPulse: 0
+                    };
+                }
+            }
+        }
+
+        function processClick(x, y) {
+            const cell = grid[x][y];
+            const player = activePlayers[currentPlayerIndex];
+
+            // Validate Ownership Match
+            if (cell.owner !== null && cell.owner.id !== player.id) return;
+
+            AudioEngine.playClick(400 + (cell.count * 100));
+
+            // Mark player as active so they can be eliminated later
+            player.hasPlayed = true;
+
+            cell.owner = player;
+            cell.count++;
+            cell.impactPulse = 1.0; 
+
+            let explosions = getExplodingCells();
+            if (explosions.length > 0) {
+                isAnimating = true;
+                triggerExplosions(explosions);
+            } else {
+                endTurn();
+            }
+        }
+
+        function endTurn() {
+            isAnimating = false;
+            if (checkWinCondition()) return;
+            
+            // Advance turn and skip any players that have been eliminated
+            let failsafe = 0;
+            do {
+                currentPlayerIndex = (currentPlayerIndex + 1) % activePlayers.length;
+                failsafe++;
+                if (failsafe > activePlayers.length * 2) break; // Prevent infinite loop safety
+            } while (activePlayers[currentPlayerIndex].isDead);
+
+            updateHUD();
+
+            if (gameMode === 'pvai' && currentPlayerIndex === 1 && !activePlayers[1].isDead) {
+                makeAIMove();
+            }
+        }
+
+        function getExplodingCells() {
+            let exploding = [];
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[x][y].count >= grid[x][y].capacity) {
+                        exploding.push({x, y});
+                    }
+                }
+            }
+            return exploding;
+        }
+
+        function triggerExplosions(explosions) {
+            if (explosions.length === 0) {
+                let nextExplosions = getExplodingCells();
+                if (nextExplosions.length > 0) {
+                    triggerExplosions(nextExplosions);
+                } else {
+                    endTurn();
+                }
+                return;
+            }
+
+            explosions.forEach(({x, y}) => {
+                const cell = grid[x][y];
+                const player = cell.owner;
+                
+                cell.count -= cell.capacity;
+                if (cell.count === 0) cell.owner = null;
+
+                shockwaves.push(new Shockwave(x, y, player.color));
+                AudioEngine.playExplosion(1.0);
+
+                const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+                directions.forEach(dir => {
+                    const nx = x + dir[0];
+                    const ny = y + dir[1];
+                    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                        particles.push(new Particle(x, y, nx, ny, player));
+                    }
+                });
+            });
+            
+            // Instant check for wiped out opponents before particles even land
+            checkWinCondition();
+        }
+
+        function checkWinCondition() {
+            // Prevent multiple triggers if the game is already over
+            if (!gameActive) return true;
+
+            let playerCounts = new Array(activePlayers.length).fill(0);
+
+            // Count cells on the grid
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[x][y].owner) {
+                        const idx = activePlayers.findIndex(p => p.id === grid[x][y].owner.id);
+                        if(idx !== -1) playerCounts[idx]++;
+                    }
+                }
+            }
+
+            // Also count particles mid-flight to prevent premature death when your last cell explodes
+            particles.forEach(p => {
+                const idx = activePlayers.findIndex(player => player.id === p.player.id);
+                if(idx !== -1) playerCounts[idx]++;
+            });
+
+            let aliveCount = 0;
+            let lastAlivePlayer = null;
+            let totalPlayersWhoPlayed = 0;
+
+            activePlayers.forEach((p, idx) => {
+                if (p.hasPlayed) totalPlayersWhoPlayed++;
+                
+                // You die if you have played previously but now hold zero atoms and zero particles
+                if (p.hasPlayed && playerCounts[idx] === 0) {
+                    p.isDead = true;
+                }
+                
+                if (!p.isDead) {
+                    aliveCount++;
+                    lastAlivePlayer = p;
+                }
+            });
+
+            // If at least 2 players have made a move, and only 1 remains alive
+            if (totalPlayersWhoPlayed >= 2 && aliveCount <= 1) {
+                showGameOver(lastAlivePlayer || activePlayers[0]);
+                return true;
+            }
+            
+            return false;
+        }
+
+        function showGameOver(winner) {
+            gameActive = false;
+            AudioEngine.playWin();
+
+            const winLabel = document.getElementById('winner-text');
+            winLabel.innerText = `${winner.name} SECURES GRID`;
+            winLabel.style.color = winner.color;
+
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            
+            gameOverTimeout = setTimeout(() => {
+                returnToMainMenu();
+            }, 6000);
+        }
+
+        class Particle {
+            constructor(startX, startY, endX, endY, player) {
+                this.startX = startX * cellW + cellW / 2;
+                this.startY = startY * cellH + cellH / 2;
+                this.endX = endX * cellW + cellW / 2;
+                this.endY = endY * cellH + cellH / 2;
+                this.x = this.startX;
+                this.y = this.startY;
+                this.targetGridX = endX;
+                this.targetGridY = endY;
+                this.player = player;
+                this.progress = 0;
+                this.speed = 0.12; 
+            }
+
+            update() {
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    const targetCell = grid[this.targetGridX][this.targetGridY];
+                    targetCell.owner = this.player;
+                    targetCell.count++;
+                    targetCell.impactPulse = 1.0; 
+                    return true;
+                }
+                
+                const ease = Math.sin((this.progress * Math.PI) / 2);
+                this.x = this.startX + (this.endX - this.startX) * ease;
+                this.y = this.startY + (this.endY - this.startY) * ease;
+                return false;
+            }
+
+            draw(g) {
+                g.save();
+                g.beginPath();
+                g.moveTo(this.startX, this.startY);
+                g.lineTo(this.x, this.y);
+                g.strokeStyle = this.player.color;
+                g.globalAlpha = 0.3;
+                g.lineWidth = cellW * 0.1;
+                g.stroke();
+
+                g.beginPath();
+                const radius = Math.min(cellW, cellH) * 0.14; 
+                g.arc(this.x, this.y, radius, 0, Math.PI * 2);
+                g.fillStyle = '#ffffff';
+                g.globalAlpha = 1.0;
+                g.fill();
+                g.restore();
+            }
+        }
+
+        class Shockwave {
+            constructor(gridX, gridY, color) {
+                this.x = gridX * cellW + cellW / 2;
+                this.y = gridY * cellH + cellH / 2;
+                this.radius = 5;
+                this.maxRadius = cellW * 1.3;
+                this.opacity = 1.0;
+                this.color = color;
+            }
+
+            update() {
+                this.radius += (this.maxRadius - this.radius) * 0.16;
+                this.opacity -= 0.06;
+                return this.opacity <= 0;
+            }
+
+            draw(g) {
+                g.save();
+                g.beginPath();
+                g.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                g.strokeStyle = this.color;
+                g.globalAlpha = Math.max(0, this.opacity);
+                g.lineWidth = 2;
+                g.stroke();
+                g.restore();
+            }
+        }
+
+        function drawBoard() {
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = '#020208';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            if (grid.length === 0) return;
+
+            ctx.save();
+            ctx.translate(gridOffsetX, gridOffsetY);
+
+            globalTime += 0.055;
+
+            // Draw Background Cells & Borders
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    const cell = grid[x][y];
+                    const cx = x * cellW;
+                    const cy = y * cellH;
+
+                    if (cell.impactPulse > 0.01) {
+                        cell.impactPulse *= 0.88;
+                    }
+
+                    if (cell.owner) {
+                        ctx.fillStyle = cell.owner.color;
+                        ctx.globalAlpha = 0.05;
+                        ctx.fillRect(cx + 2, cy + 2, cellW - 4, cellH - 4);
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    ctx.strokeStyle = cell.owner ? cell.owner.borderGlow : 'rgba(255, 255, 255, 0.05)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(cx + 1, cy + 1, cellW - 2, cellH - 2);
+
+                    if (cell.impactPulse > 0.02) {
+                        ctx.fillStyle = cell.owner ? cell.owner.color : '#ffffff';
+                        ctx.globalAlpha = cell.impactPulse * 0.25;
+                        ctx.fillRect(cx + 2, cy + 2, cellW - 4, cellH - 4);
+                        ctx.globalAlpha = 1.0;
+                    }
+
+                    for (let i = 0; i < cell.capacity; i++) {
+                        const angle = (i * (Math.PI * 2) / cell.capacity) - Math.PI / 4;
+                        const rx = cx + cellW/2 + Math.cos(angle) * (cellW * 0.4);
+                        const ry = cy + cellH/2 + Math.sin(angle) * (cellH * 0.4);
+
+                        ctx.beginPath();
+                        ctx.arc(rx, ry, 2, 0, Math.PI * 2);
+                        if (cell.count === cell.capacity - 1) {
+                            ctx.fillStyle = (Math.floor(globalTime * 8) % 2 === 0) ? '#ff3333' : '#330000';
+                        } else if (i < cell.count) {
+                            ctx.fillStyle = cell.owner.color;
+                        } else {
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                        }
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Draw Atoms
+            for (let x = 0; x < COLS; x++) {
+                for (let y = 0; y < ROWS; y++) {
+                    const cell = grid[x][y];
+                    if (cell.count > 0) {
+                        const centerX = x * cellW + cellW / 2;
+                        const centerY = y * cellH + cellH / 2;
+                        const atomRadius = Math.min(cellW, cellH) * 0.13;
+                        const currentOrbitRadius = atomRadius * 1.25;
+                        const isThreatState = (cell.count === cell.capacity - 1);
+
+                        for (let i = 0; i < cell.count; i++) {
+                            let offsetX = 0;
+                            let offsetY = 0;
+                            
+                            if (cell.count > 1) {
+                                const speedMultiplier = isThreatState ? 2.0 : 1.0;
+                                const angle = (globalTime * speedMultiplier) + (i * (Math.PI * 2) / cell.count);
+                                offsetX = Math.cos(angle) * currentOrbitRadius;
+                                offsetY = Math.sin(angle) * currentOrbitRadius;
+                            }
+
+                            ctx.save();
+                            ctx.translate(centerX + offsetX, centerY + offsetY);
+                            
+                            ctx.beginPath();
+                            ctx.arc(0, 0, atomRadius, 0, Math.PI * 2);
+                            ctx.strokeStyle = cell.owner.color;
+                            ctx.lineWidth = 1.5;
+                            ctx.stroke();
+
+                            ctx.beginPath();
+                            ctx.arc(0, 0, atomRadius * 0.6, 0, Math.PI * 2);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fill();
+
+                            ctx.restore();
+                        }
+                    }
+                }
+            }
+
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                shockwaves[i].draw(ctx);
+                if (shockwaves[i].update()) {
+                    shockwaves.splice(i, 1);
+                }
+            }
+
+            if (particles.length > 0) {
+                let particleLanded = false;
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    particles[i].draw(ctx);
+                    if (particles[i].update()) {
+                        particles.splice(i, 1);
+                        particleLanded = true;
+                    }
+                }
+                
+                // Immediately check win condition mid-reaction right after a particle hits a cell
+                if (particleLanded) {
+                    checkWinCondition();
+                }
+
+                if (particles.length === 0) {
+                    triggerExplosions([]); 
+                    if (gameActive) updateHUD();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function animateLoop() {
+            drawBoard();
+            requestAnimationFrame(animateLoop);
+        }
+
+        window.onload = function() {
+            initGrid();
+            resize();
+            animateLoop();
+        }
+    </script>
+</body>
+</html>
